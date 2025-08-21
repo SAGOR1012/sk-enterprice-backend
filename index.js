@@ -31,6 +31,10 @@ async function run() {
       .db('sk-enterprise-DB')
       .collection('allProducts');
     const usersCollections = client.db('sk-enterprise-DB').collection('users');
+    const ordersCollections = client
+      .db('sk-enterprise-DB')
+      .collection('orders');
+
     /* MongoDB collections End */
 
     app.get('/', (req, res) => {
@@ -184,6 +188,41 @@ async function run() {
     });
 
     /* ====================== Product related API END====================== */
+
+    /* ====================== Orders related API Start====================== */
+
+    app.get('/orders', async (req, res) => {
+      try {
+        const orders = await ordersCollections.find().toArray();
+        res.send(orders);
+      } catch (error) {
+        res.status(500).send({ error: 'Failed to fetch order' });
+      }
+    });
+
+    app.get('/products', async (req, res) => {
+      try {
+        const products = await allProductsCollection.find().toArray();
+        res.send(products);
+      } catch (error) {
+        res.status(500).send({ error: 'Failed to fetch products' });
+      }
+    });
+    app.post('/orders', async (req, res) => {
+      try {
+        const newOrder = req.body;
+        const result = await ordersCollections.insertOne(newOrder);
+        res.status(201).send({
+          message: 'Order post successfully',
+          orderId: result.insertedId,
+        });
+      } catch {
+        error;
+      }
+      {
+        res.status(500).send({ error: 'Failed to complete this order' });
+      }
+    });
 
     await client.db('admin').command({ ping: 1 });
     console.log(
