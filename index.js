@@ -208,19 +208,55 @@ async function run() {
         res.status(500).send({ error: 'Failed to fetch products' });
       }
     });
+    // app.post('/orders', async (req, res) => {
+    //   try {
+    //     const newOrder = req.body;
+    //     const result = await ordersCollections.insertOne(newOrder);
+    //     res.status(201).send({
+    //       message: 'Order post successfully',
+    //       orderId: result.insertedId,
+    //     });
+    //   } catch {
+    //     error;
+    //   }
+    //   {
+    //     res.status(500).send({ error: 'Failed to complete this order' });
+    //   }
+    // });
+
+    // Confirm an order and decrease product stock
+    // Confirm an order and decrease product stock
     app.post('/orders', async (req, res) => {
       try {
         const newOrder = req.body;
-        const result = await ordersCollections.insertOne(newOrder);
+
+        // ১. অর্ডার ইনসার্ট
+        const orderResult = await ordersCollections.insertOne(newOrder);
+
+        // ২. প্রতিটি প্রোডাক্টের স্টক আপডেট
+        for (const item of newOrder.items) {
+          if (!item._id) continue; // যদি _id না থাকে skip
+          const product = await allProductsCollection.findOne({
+            _id: new ObjectId(item._id),
+          });
+
+          if (!product) continue; // যদি প্রোডাক্ট না থাকে skip
+
+          // স্টক কমানো, ensure stock doesn't go negative
+          const newStock = Math.max(0, (product.stock || 0) - item.quantity);
+          await allProductsCollection.updateOne(
+            { _id: new ObjectId(item._id) },
+            { $set: { stock: newStock } }
+          );
+        }
+
         res.status(201).send({
-          message: 'Order post successfully',
-          orderId: result.insertedId,
+          message: 'Order placed successfully',
+          orderId: orderResult.insertedId,
         });
-      } catch {
-        error;
-      }
-      {
-        res.status(500).send({ error: 'Failed to complete this order' });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ error: 'Failed to place order' });
       }
     });
 
