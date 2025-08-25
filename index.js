@@ -26,17 +26,29 @@ async function run() {
   try {
     await client.connect();
 
-    /* MongoDB collections Start */
+    /* ----------------------------------MongoDB collections Start -------------------------------*/
+    /* products collection */
     const allProductsCollection = client
       .db('sk-enterprise-DB')
       .collection('allProducts');
+    /* Users collection  */
     const usersCollections = client.db('sk-enterprise-DB').collection('users');
+    /* Orders collection */
     const ordersCollections = client
       .db('sk-enterprise-DB')
       .collection('orders');
+    /* Daily sell collection  */
+    const dailySellCollection = client
+      .db('sk-enterprise-DB')
+      .collection('dailySell');
+    /* Monthly sell collection */
+    const monthlySellCollection = client
+      .db('sk-enterprise-DB')
+      .collection('monthlySell');
 
     /* MongoDB collections End */
 
+    /* Test API */
     app.get('/', (req, res) => {
       res.send('sk server on');
     });
@@ -191,6 +203,7 @@ async function run() {
 
     /* ====================== Orders related API Start====================== */
 
+    /* get all orders */
     app.get('/orders', async (req, res) => {
       try {
         const orders = await ordersCollections.find().toArray();
@@ -199,7 +212,97 @@ async function run() {
         res.status(500).send({ error: 'Failed to fetch order' });
       }
     });
+    /* post individual order */
+    // app.post('/orders', async (req, res) => {
+    //   try {
+    //     const newOrder = req.body;
 
+    //     // ১. অর্ডার ইনসার্ট
+    //     const orderResult = await ordersCollections.insertOne(newOrder);
+
+    //     // ২. প্রতিটি প্রোডাক্টের স্টক আপডেট
+    //     for (const item of newOrder.items) {
+    //       if (!item._id) continue; // যদি _id না থাকে skip
+    //       const product = await allProductsCollection.findOne({
+    //         _id: new ObjectId(item._id),
+    //       });
+
+    //       if (!product) continue; // যদি প্রোডাক্ট না থাকে skip
+
+    //       // স্টক কমানো, ensure stock doesn't go negative
+    //       const newStock = Math.max(0, (product.stock || 0) - item.quantity);
+    //       await allProductsCollection.updateOne(
+    //         { _id: new ObjectId(item._id) },
+    //         { $set: { stock: newStock } }
+    //       );
+    //     }
+
+    //     res.status(201).send({
+    //       message: 'Order placed successfully',
+    //       orderId: orderResult.insertedId,
+    //     });
+    //   } catch (error) {
+    //     console.error(error);
+    //     res.status(500).send({ error: 'Failed to place order' });
+    //   }
+    // });
+    app.post('/orders', async (req, res) => {
+      try {
+        const newOrder = req.body;
+        const orderResult = await ordersCollections.insertOne(newOrder);
+
+        // -------- স্টক আপডেট --------
+        for (const item of newOrder.items) {
+          if (!item._id) continue;
+          const product = await allProductsCollection.findOne({
+            _id: new ObjectId(item._id),
+          });
+
+          if (!product) continue;
+
+          const newStock = Math.max(0, (product.stock || 0) - item.quantity);
+          await allProductsCollection.updateOne(
+            { _id: new ObjectId(item._id) },
+            { $set: { stock: newStock } }
+          );
+        }
+
+        // -------- ডেইলি সেল আপডেট --------
+        const today = new Date();
+        const dateKey = today.toISOString().split('T')[0]; // yyyy-mm-dd
+        const orderTotal = newOrder.total || 0;
+
+        await dailySellCollection.updateOne(
+          { date: dateKey },
+          {
+            $inc: { totalSell: orderTotal },
+            $push: { orders: orderResult.insertedId },
+          },
+          { upsert: true }
+        );
+
+        // -------- মাসিক সেল আপডেট --------
+        const monthKey = `${today.getFullYear()}-${today.getMonth() + 1}`; // yyyy-mm
+        await monthlySellCollection.updateOne(
+          { month: monthKey },
+          {
+            $inc: { totalSell: orderTotal },
+            $push: { orders: orderResult.insertedId },
+          },
+          { upsert: true }
+        );
+
+        res.status(201).send({
+          message: 'Order placed & sales updated successfully',
+          orderId: orderResult.insertedId,
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ error: 'Failed to place order' });
+      }
+    });
+
+    /* get all products function  */
     app.get('/products', async (req, res) => {
       try {
         const products = await allProductsCollection.find().toArray();
@@ -208,56 +311,17 @@ async function run() {
         res.status(500).send({ error: 'Failed to fetch products' });
       }
     });
-    // app.post('/orders', async (req, res) => {
-    //   try {
-    //     const newOrder = req.body;
-    //     const result = await ordersCollections.insertOne(newOrder);
-    //     res.status(201).send({
-    //       message: 'Order post successfully',
-    //       orderId: result.insertedId,
-    //     });
-    //   } catch {
-    //     error;
-    //   }
-    //   {
-    //     res.status(500).send({ error: 'Failed to complete this order' });
-    //   }
-    // });
 
-    // Confirm an order and decrease product stock
-    // Confirm an order and decrease product stock
-    app.post('/orders', async (req, res) => {
-      try {
-        const newOrder = req.body;
+    /* ====================== Daily Sell APIs ====================== */
+    app.get('/daily-sell', async (req, res) => {
+      const records = await dailySellCollection.find().toArray();
+      res.send(records);
+    });
 
-        // ১. অর্ডার ইনসার্ট
-        const orderResult = await ordersCollections.insertOne(newOrder);
-
-        // ২. প্রতিটি প্রোডাক্টের স্টক আপডেট
-        for (const item of newOrder.items) {
-          if (!item._id) continue; // যদি _id না থাকে skip
-          const product = await allProductsCollection.findOne({
-            _id: new ObjectId(item._id),
-          });
-
-          if (!product) continue; // যদি প্রোডাক্ট না থাকে skip
-
-          // স্টক কমানো, ensure stock doesn't go negative
-          const newStock = Math.max(0, (product.stock || 0) - item.quantity);
-          await allProductsCollection.updateOne(
-            { _id: new ObjectId(item._id) },
-            { $set: { stock: newStock } }
-          );
-        }
-
-        res.status(201).send({
-          message: 'Order placed successfully',
-          orderId: orderResult.insertedId,
-        });
-      } catch (error) {
-        console.error(error);
-        res.status(500).send({ error: 'Failed to place order' });
-      }
+    /* ====================== Monthly Sell APIs ====================== */
+    app.get('/monthly-sell', async (req, res) => {
+      const records = await monthlySellCollection.find().toArray();
+      res.send(records);
     });
 
     await client.db('admin').command({ ping: 1 });
