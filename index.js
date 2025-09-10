@@ -45,6 +45,9 @@ async function run() {
     const monthlySellCollection = client
       .db('sk-enterprise-DB')
       .collection('monthlySell');
+    const monthlyTargetCollection = client
+      .db('sk-enterprise-DB')
+      .collection('monthlyTarget');
 
     /* MongoDB collections End */
 
@@ -324,6 +327,53 @@ async function run() {
       res.send(records);
     });
 
+    /* ====================== Monthly Target API ====================== */
+
+    // Get target for a specific month
+    app.get('/monthly-target', async (req, res) => {
+      try {
+        const month = req.query.month; // e.g., 2025-09
+        if (!month)
+          return res.status(400).send({ message: 'Month is required' });
+
+        const targetRecord = await monthlyTargetCollection.findOne({ month });
+        if (!targetRecord)
+          return res
+            .status(404)
+            .send({ message: 'No target found for this month' });
+
+        res.send(targetRecord);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ error: 'Failed to fetch monthly target' });
+      }
+    });
+
+    // Set or update target for a specific month
+    app.post('/monthly-target', async (req, res) => {
+      try {
+        const { month, value } = req.body;
+        if (!month || value == null)
+          return res
+            .status(400)
+            .send({ message: 'Month and value are required' });
+
+        // Update if exists, else create
+        const result = await monthlyTargetCollection.findOneAndUpdate(
+          { month },
+          { $set: { value } },
+          { upsert: true, returnDocument: 'after' }
+        );
+
+        res.send({
+          message: 'Monthly target set/updated',
+          target: result.value,
+        });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ error: 'Failed to set/update monthly target' });
+      }
+    });
     await client.db('admin').command({ ping: 1 });
     console.log(
       'Pinged your deployment. You successfully connected to MongoDB!'
