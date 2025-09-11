@@ -72,12 +72,16 @@ async function run() {
         const user = await usersCollections.findOne({
           email: req.params.email,
         });
-        if (!user) return res.status(404).send({ message: 'User not found ' });
+        if (!user) {
+          return res.status(404).send({ message: 'User not found' });
+        }
+        res.send(user); // <-- response পাঠাতে হবে
       } catch (error) {
         console.log(error);
-        res.status(500).send({ error: 'Failed to fetch users' });
+        res.status(500).send({ error: 'Failed to fetch user' });
       }
     });
+
     /* ====================== User API ====================== */
     // Create a new user (signup) with password hashing
     app.post('/users', async (req, res) => {
