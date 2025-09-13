@@ -423,7 +423,7 @@ const port = process.env.PORT || 5000;
 
 /* ---------- Middleware ---------- */
 const allowedOrigins = [
-  // 'http://localhost:5173',
+  // 'http://localhost:5173', // for local host
   'https://skenterprise1.netlify.app',
 ];
 app.use(
@@ -498,7 +498,7 @@ async function run() {
         httpOnly: true,
         // secure: false, // dev environment
         secure: true, // production
-        sameSite: 'lax',
+        sameSite: 'lax', // production
       });
 
       res.send({ token });
