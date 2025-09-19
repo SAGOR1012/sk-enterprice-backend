@@ -411,7 +411,6 @@
 
 // index.js
 
-/* ......................2nd */
 // const express = require('express');
 // const cors = require('cors');
 // require('dotenv').config();
@@ -498,8 +497,8 @@
 
 //       res.cookie('token', token, {
 //         httpOnly: true,
-//         // secure: false, // dev environment
-//         secure: true, // production
+//         secure: false, // dev environment
+//         // secure: true, // production
 //         // sameSite: 'lax', // production
 //       });
 
@@ -708,7 +707,7 @@
 // app.listen(port, () => {
 //   console.log(`🚀 Server running on port: ${port}`);
 // });
-// -----------------------final =================
+
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
@@ -721,13 +720,24 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 /* ---------- Middleware ---------- */
+const allowedOrigins = [
+  'http://localhost:5173', // For local React development server
+  'https://skenterprise1.netlify.app', // Your production frontend
+];
+
 app.use(
   cors({
-    origin: [
-      'https://skenterprise1.netlify.app', // তোমার frontend link
-      // "http://localhost:5173" // চাইলে dev এর জন্য uncomment করতে পারো
-    ],
-    credentials: true,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) === -1) {
+        const msg =
+          'The CORS policy for this site does not allow access from the specified Origin.';
+        return callback(new Error(msg), false);
+      }
+      return callback(null, true);
+    },
+    credentials: true, // IMPORTANT: Allow sending cookies with requests
   })
 );
 
@@ -743,6 +753,7 @@ const verifyToken = (req, res, next) => {
 
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
     if (err) {
+      console.error('JWT verification error:', err);
       return res.status(403).send({ message: 'Forbidden: Invalid token' });
     }
     req.user = decoded;
@@ -751,6 +762,7 @@ const verifyToken = (req, res, next) => {
 };
 
 /* ---------- MongoDB Setup ---------- */
+// Make sure your .env file has DB_USER and DB_PASS set
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@skenterprise.bvccnzb.mongodb.net/?retryWrites=true&w=majority&appName=skenterprise`;
 
 const client = new MongoClient(uri, {
@@ -774,25 +786,42 @@ async function run() {
     const monthlyTargetCollection = db.collection('monthlyTarget');
 
     /* ---------- Auth API ---------- */
+    // Login route: creates a JWT and sets it as an httpOnly cookie
     app.post('/jwt', async (req, res) => {
-      const user = req.body; // { email }
+      const user = req.body; // Expects { email }
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
         expiresIn: '1h',
       });
 
       res.cookie('token', token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // production এ secure=true
-        sameSite: 'none', // cross-site cookie allow করতে
+        secure: false, // <--- প্রোডাকশনের জন্য এটি `true` করতে হবে (HTTPS বাধ্যতামূলক)
+        // sameSite: 'lax', // For local development,
+        /* when use production site  */
+        sameSite: 'none', // <--- প্রোডাকশনের জন্য এটি `none` করতে হবে যদি ফ্রন্টএন্ড এবং ব্যাকএন্ড ভিন্ন ডোমেইনে থাকে
+
+        maxAge: 3600000, // 1 hour in milliseconds
       });
 
-      res.send({ token });
+      res
+        .status(200)
+        .send({ success: true, message: 'Logged in successfully' });
+    });
+
+    // Logout route: clears the JWT cookie
+    app.post('/logout', (req, res) => {
+      res.clearCookie('token', {
+        httpOnly: true,
+        secure: false, // Match secure setting used when creating the cookie
+        sameSite: 'lax', // Match sameSite setting
+      });
+      res
+        .status(200)
+        .send({ success: true, message: 'Logged out successfully' });
     });
 
     /* ---------- Public Test ---------- */
-    app.get('/', (req, res) =>
-      res.send('🚀 SK Enterprise server is running ✅')
-    );
+    app.get('/', (req, res) => res.send('SK Enterprise server is running ✅'));
 
     /* ---------- User APIs ---------- */
     app.get('/users', verifyToken, async (req, res) => {
@@ -890,6 +919,7 @@ async function run() {
     app.post('/orders', verifyToken, async (req, res) => {
       const newOrder = req.body;
       const orderResult = await ordersCollections.insertOne(newOrder);
+      // console.log('tok tok token', req.cookies.token);
 
       // Update stock
       for (const item of newOrder.items || []) {
@@ -974,7 +1004,8 @@ async function run() {
     await client.db('admin').command({ ping: 1 });
     console.log('✅ Connected to MongoDB!');
   } finally {
-    // keep connection alive
+    // In a real application, you might close the connection here if it's not meant to be long-lived.
+    // For a persistent server, keep it open.
   }
 }
 
