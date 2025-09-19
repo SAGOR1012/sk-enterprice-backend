@@ -721,7 +721,7 @@ const port = process.env.PORT || 5000;
 
 /* ---------- Middleware ---------- */
 const allowedOrigins = [
-  'http://localhost:5173', // For local React development server
+  // 'http://localhost:5173', // For local React development server
   'https://skenterprise1.netlify.app', // Your production frontend
 ];
 
@@ -730,6 +730,7 @@ app.use(
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
+      // যদি origin, allowedOrigins Array তে না থাকে, তাহলে ব্লক করুন
       if (allowedOrigins.indexOf(origin) === -1) {
         const msg =
           'The CORS policy for this site does not allow access from the specified Origin.';
@@ -795,7 +796,7 @@ async function run() {
 
       res.cookie('token', token, {
         httpOnly: true,
-        secure: false, // <--- প্রোডাকশনের জন্য এটি `true` করতে হবে (HTTPS বাধ্যতামূলক)
+        secure: true, // <--- প্রোডাকশনের জন্য এটি `true` করতে হবে (HTTPS বাধ্যতামূলক)
         // sameSite: 'lax', // For local development,
         /* when use production site  */
         sameSite: 'none', // <--- প্রোডাকশনের জন্য এটি `none` করতে হবে যদি ফ্রন্টএন্ড এবং ব্যাকএন্ড ভিন্ন ডোমেইনে থাকে
@@ -812,8 +813,8 @@ async function run() {
     app.post('/logout', (req, res) => {
       res.clearCookie('token', {
         httpOnly: true,
-        secure: false, // Match secure setting used when creating the cookie
-        sameSite: 'lax', // Match sameSite setting
+        secure: false, // <--- প্রোডাকশনের জন্য এটি `true` করতে হবে
+        sameSite: 'lax', //<--- প্রোডাকশনের জন্য এটি `none` করতে হবে local 'lax'
       });
       res
         .status(200)
