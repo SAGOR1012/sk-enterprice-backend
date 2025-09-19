@@ -813,8 +813,8 @@ async function run() {
     app.post('/logout', (req, res) => {
       res.clearCookie('token', {
         httpOnly: true,
-        secure: false, // <--- প্রোডাকশনের জন্য এটি `true` করতে হবে
-        sameSite: 'lax', //<--- প্রোডাকশনের জন্য এটি `none` করতে হবে local 'lax'
+        secure: true, // <--- প্রোডাকশনের জন্য এটি `true` করতে হবে
+        sameSite: 'none', //<--- প্রোডাকশনের জন্য এটি `none` করতে হবে local 'lax'
       });
       res
         .status(200)
