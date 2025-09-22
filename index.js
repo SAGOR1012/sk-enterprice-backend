@@ -410,6 +410,7 @@
 // });
 
 // index.js
+//...............with jwt start.........................
 
 // const express = require('express');
 // const cors = require('cors');
@@ -424,8 +425,8 @@
 
 // /* ---------- Middleware ---------- */
 // const allowedOrigins = [
-//   // 'http://localhost:5173', // for local host
-//   'https://skenterprise1.netlify.app',
+//   'http://localhost:5173', // for local host
+//   // 'https://skenterprise1.netlify.app',
 // ];
 // app.use(
 //   cors({
@@ -439,13 +440,7 @@
 //     credentials: true,
 //   })
 // );
-// // app.use(
-// //   cors({
-// //     // origin: ['http://localhost:5173'], // React client
-// //     origin: ['https://skenterprise1.netlify.app'], // production
-// //     credentials: true,
-// //   })
-// // );
+
 // app.use(express.json());
 // app.use(cookieParser());
 
@@ -499,7 +494,7 @@
 //         httpOnly: true,
 //         secure: false, // dev environment
 //         // secure: true, // production
-//         // sameSite: 'lax', // production
+//         sameSite: 'lax', // production
 //       });
 
 //       res.send({ token });
@@ -707,15 +702,11 @@
 // app.listen(port, () => {
 //   console.log(`🚀 Server running on port: ${port}`);
 // });
+// //...............with jwt end.........................
 
-// fix 1......................................................
-//
-
-//fix 2......................................................
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const bcrypt = require('bcrypt');
 const cookieParser = require('cookie-parser');
@@ -724,32 +715,25 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 /* ---------- Middleware ---------- */
+const allowedOrigins = [
+  'http://localhost:5173', // for local host
+  'https://skenterprise1.netlify.app',
+];
 app.use(
   cors({
-    origin: ['https://skenterprise1.netlify.app'], // ✅ আপনার ফ্রন্টএন্ড ডোমেইন
-    credentials: true, // ✅ কুকি/সেশন পাঠানোর জন্য
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
   })
 );
 
 app.use(express.json());
 app.use(cookieParser());
-
-/* ---------- JWT Verify Middleware ---------- */
-const verifyToken = (req, res, next) => {
-  const token = req.cookies?.token;
-  if (!token) {
-    return res.status(401).send({ message: 'Unauthorized: No token' });
-  }
-
-  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-    if (err) {
-      console.error('JWT verification error:', err);
-      return res.status(403).send({ message: 'Forbidden: Invalid token' });
-    }
-    req.user = decoded;
-    next();
-  });
-};
 
 /* ---------- MongoDB Setup ---------- */
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@skenterprise.bvccnzb.mongodb.net/?retryWrites=true&w=majority&appName=skenterprise`;
@@ -774,46 +758,16 @@ async function run() {
     const monthlySellCollection = db.collection('monthlySell');
     const monthlyTargetCollection = db.collection('monthlyTarget');
 
-    /* ---------- Auth API ---------- */
-    app.post('/jwt', async (req, res) => {
-      const user = req.body; // expects { email }
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: '1h',
-      });
-
-      res.cookie('token', token, {
-        httpOnly: true,
-        secure: true, // ✅ HTTPS ছাড়া কাজ করবে না
-        sameSite: 'none', // ✅ আলাদা ডোমেইন হলে অবশ্যই none
-        maxAge: 3600000,
-      });
-
-      res
-        .status(200)
-        .send({ success: true, message: 'Logged in successfully' });
-    });
-
-    app.post('/logout', (req, res) => {
-      res.clearCookie('token', {
-        httpOnly: true,
-        secure: true, // ✅ same as login
-        sameSite: 'none',
-      });
-      res
-        .status(200)
-        .send({ success: true, message: 'Logged out successfully' });
-    });
-
     /* ---------- Public Test ---------- */
     app.get('/', (req, res) => res.send('SK Enterprise server is running ✅'));
 
     /* ---------- User APIs ---------- */
-    app.get('/users', verifyToken, async (req, res) => {
+    app.get('/users', async (req, res) => {
       const users = await usersCollections.find().toArray();
       res.send(users);
     });
 
-    app.get('/user/:email', verifyToken, async (req, res) => {
+    app.get('/user/:email', async (req, res) => {
       const user = await usersCollections.findOne({ email: req.params.email });
       if (!user) return res.status(404).send({ message: 'User not found' });
       res.send(user);
@@ -855,18 +809,18 @@ async function run() {
     });
 
     /* ---------- Product APIs ---------- */
-    app.get('/products', verifyToken, async (req, res) => {
+    app.get('/products', async (req, res) => {
       const products = await allProductsCollection.find().toArray();
       res.send(products);
     });
 
-    app.post('/products', verifyToken, async (req, res) => {
+    app.post('/products', async (req, res) => {
       const newProduct = req.body;
       const result = await allProductsCollection.insertOne(newProduct);
       res.status(201).send({ message: 'Product added', id: result.insertedId });
     });
 
-    app.put('/products/:id', verifyToken, async (req, res) => {
+    app.put('/products/:id', async (req, res) => {
       const { id } = req.params;
       if (!ObjectId.isValid(id))
         return res.status(400).send({ error: 'Invalid ID' });
@@ -881,7 +835,7 @@ async function run() {
       res.send({ message: 'Product updated' });
     });
 
-    app.delete('/products/:id', verifyToken, async (req, res) => {
+    app.delete('/products/:id', async (req, res) => {
       const { id } = req.params;
       if (!ObjectId.isValid(id))
         return res.status(400).send({ error: 'Invalid ID' });
@@ -895,12 +849,12 @@ async function run() {
     });
 
     /* ---------- Orders APIs ---------- */
-    app.get('/orders', verifyToken, async (req, res) => {
+    app.get('/orders', async (req, res) => {
       const orders = await ordersCollections.find().toArray();
       res.send(orders);
     });
 
-    app.post('/orders', verifyToken, async (req, res) => {
+    app.post('/orders', async (req, res) => {
       const newOrder = req.body;
       const orderResult = await ordersCollections.insertOne(newOrder);
 
@@ -950,18 +904,18 @@ async function run() {
     });
 
     /* ---------- Daily & Monthly Sell APIs ---------- */
-    app.get('/daily-sell', verifyToken, async (req, res) => {
+    app.get('/daily-sell', async (req, res) => {
       const records = await dailySellCollection.find().toArray();
       res.send(records);
     });
 
-    app.get('/monthly-sell', verifyToken, async (req, res) => {
+    app.get('/monthly-sell', async (req, res) => {
       const records = await monthlySellCollection.find().toArray();
       res.send(records);
     });
 
     /* ---------- Monthly Target APIs ---------- */
-    app.get('/monthly-target', verifyToken, async (req, res) => {
+    app.get('/monthly-target', async (req, res) => {
       const month = req.query.month;
       if (!month) return res.status(400).send({ message: 'Month is required' });
 
@@ -971,7 +925,7 @@ async function run() {
       res.send(targetRecord);
     });
 
-    app.post('/monthly-target', verifyToken, async (req, res) => {
+    app.post('/monthly-target', async (req, res) => {
       const { month, value } = req.body;
       if (!month || value == null)
         return res.status(400).send({ message: 'Month & value required' });
@@ -987,7 +941,7 @@ async function run() {
     await client.db('admin').command({ ping: 1 });
     console.log('✅ Connected to MongoDB!');
   } finally {
-    // Keep connection open
+    // keep connection alive
   }
 }
 
@@ -1003,3 +957,5 @@ app.use((err, req, res, next) => {
 app.listen(port, () => {
   console.log(`🚀 Server running on port: ${port}`);
 });
+
+/* this is not a safe code  */
