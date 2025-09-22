@@ -705,6 +705,7 @@
 //...............with jwt end.........................
 
 const express = require('express');
+const cors = require('cors');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const bcrypt = require('bcrypt');
@@ -713,6 +714,7 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 /* ---------- Middleware ---------- */
+app.use(cors()); // ✅ open CORS (no origin restriction)
 app.use(express.json());
 
 /* ---------- MongoDB Setup ---------- */
@@ -928,10 +930,10 @@ async function run() {
 run().catch(console.dir);
 
 /* ---------- Global Error Handler ---------- */
-app.use((err, req, res, next) => {
-  console.error('Unhandled Error:', err.stack);
-  res.status(500).send({ error: 'Something went wrong!' });
-});
+// app.use((err, req, res, next) => {
+//   console.error('Unhandled Error:', err.stack);
+//   res.status(500).send({ error: 'Something went wrong!' });
+// });
 
 /* ---------- Start Server ---------- */
 app.listen(port, () => {
