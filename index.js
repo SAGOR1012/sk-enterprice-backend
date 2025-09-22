@@ -702,38 +702,18 @@
 // app.listen(port, () => {
 //   console.log(`🚀 Server running on port: ${port}`);
 // });
-// //...............with jwt end.........................
+//...............with jwt end.........................
 
 const express = require('express');
-const cors = require('cors');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const bcrypt = require('bcrypt');
-const cookieParser = require('cookie-parser');
 
 const app = express();
 const port = process.env.PORT || 5000;
 
 /* ---------- Middleware ---------- */
-const allowedOrigins = [
-  'http://localhost:5173' || // for local host
-    'https://skenterprise1.netlify.app',
-];
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-  })
-);
-
 app.use(express.json());
-app.use(cookieParser());
 
 /* ---------- MongoDB Setup ---------- */
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@skenterprise.bvccnzb.mongodb.net/?retryWrites=true&w=majority&appName=skenterprise`;
@@ -957,5 +937,3 @@ app.use((err, req, res, next) => {
 app.listen(port, () => {
   console.log(`🚀 Server running on port: ${port}`);
 });
-
-/* this is not a safe code  */
