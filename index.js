@@ -716,8 +716,8 @@ const port = process.env.PORT || 5000;
 
 /* ---------- Middleware ---------- */
 const allowedOrigins = [
-  'http://localhost:5173', // for local host
-  'https://skenterprise1.netlify.app',
+  'http://localhost:5173' || // for local host
+    'https://skenterprise1.netlify.app',
 ];
 app.use(
   cors({
