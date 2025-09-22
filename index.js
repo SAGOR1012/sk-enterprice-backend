@@ -712,9 +712,23 @@ const bcrypt = require('bcrypt');
 
 const app = express();
 const port = process.env.PORT || 5000;
-
 /* ---------- Middleware ---------- */
-app.use(cors()); // ✅ open CORS (no origin restriction)
+const allowedOrigins = [process.env.CLIENT_URL, process.env.PROD_URL];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // allow requests with no origin (like mobile apps, Postman)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
 /* ---------- MongoDB Setup ---------- */
