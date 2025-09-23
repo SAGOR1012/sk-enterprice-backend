@@ -753,6 +753,7 @@ async function run() {
     const dailySellCollection = db.collection('dailySell');
     const monthlySellCollection = db.collection('monthlySell');
     const monthlyTargetCollection = db.collection('monthlyTarget');
+    const shortProductListCollection = db.collection('shortProductList');
 
     /* ---------- Public Test ---------- */
     app.get('/', (req, res) => res.send('SK Enterprise server is running ✅'));
@@ -934,8 +935,69 @@ async function run() {
       res.send({ message: 'Monthly target set/updated', target: result.value });
     });
 
-    await client.db('admin').command({ ping: 1 });
-    console.log('✅ Connected to MongoDB!');
+    /* Short List Product api start */
+    app.post('/shortProductList', async (req, res) => {
+      const product = req.body; // { name, quantity, status }
+      if (!product.name || !product.quantity) {
+        return res.status(400).send({ message: 'Name and Quantity required' });
+      }
+
+      // by default add "pending" if status not provided
+      const newProduct = {
+        ...product,
+        status: product.status || 'pending',
+      };
+
+      const result = await shortProductListCollection.insertOne(newProduct);
+      res.send(result);
+    });
+
+    app.get('/shortProductList', async (req, res) => {
+      const products = await shortProductListCollection.find().toArray();
+      res.send(products);
+    });
+
+    // ✅ Short product update (mark as Done)
+    app.patch('/shortProductList/:id', async (req, res) => {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ error: 'Invalid ID' });
+      }
+
+      const result = await shortProductListCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { status } }
+      );
+
+      if (!result.matchedCount) {
+        return res.status(404).send({ error: 'Short Product Not Found' });
+      }
+
+      res.send({ message: 'Updated successfully', status });
+    });
+
+    // ✅ Short product delete method
+    app.delete('/shortProductList/:id', async (req, res) => {
+      const { id } = req.params;
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ error: 'Invalid ID' });
+      }
+
+      const result = await shortProductListCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
+
+      if (!result.deletedCount)
+        return res.status(404).send({ error: 'Short Product Not Found' });
+
+      res.send({ message: 'Deleted successfully' });
+    });
+    /* Short List Product api end */
+
+    // await client.db('admin').command({ ping: 1 });
+    // console.log('✅ Connected to MongoDB!');
   } finally {
     // keep connection alive
   }
